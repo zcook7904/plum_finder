@@ -1,7 +1,7 @@
 SF_plum_finder
 ======
 
-A program that finds the nearest plum trees in San Francisco
+A program that finds the nearest plum trees to a given address in San Francisco
 
 Installation
 ------------
@@ -10,23 +10,29 @@ To install with pip, run:
 
     pip install SF_plum_finder
 
-and then:
-
-`pip install -r requirements.txt`
-
-to install dependencies
 
 Usage
 ----------
+### Cloned Repository:
 CLI usage can be achieved by entering:
 
-`python src/SF_plum_finder [street address in San Francisco]`
+```python src/SF_plum_finder [street address in San Francisco]```
 
-in the working directory
+in the working directory.
+
+### As a module
+Simple CLI use can be acheived through the following script:
+```
+'from SF_plum_finder import plum_finder
+
+plum_finder.command_line_runner()'
+```
+
+
 
 Contribute
 ----------
-If you'd like to contribute to plumr, check out https://github.com/zcook7904/plumr
+If you'd like to contribute to SF_plum_finder, check out https://github.com/zcook7904/plum_finder
 
 Tree Locations
 ----------
