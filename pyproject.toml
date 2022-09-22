@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "plum_finder"
+version = "1.0.0"
+authors = [
+  { name="Zaven Cook", email="zavencook@gmail.com" },
+]
+description = "Find the closest plum in San Francisco"
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/zcook7904/plum_finder"
+"Bug Tracker" = "https://github.com/zcook7904/plum_finder/issues"
