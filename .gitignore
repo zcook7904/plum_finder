@@ -4,4 +4,4 @@ keys.txt
 */__pycache__
 dist
 .idea
-
+/src/SF_plum_finder.egg-info
