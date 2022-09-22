@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "SF_plum_finder"
-version = "1.0.0"
+version = "1.0.3"
 authors = [
   { name="Zaven Cook", email="zavencook@gmail.com" },
 ]
@@ -16,6 +16,11 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+]
+dependencies = [
+    "googlemaps==4.6.0",
+    "numpy==1.23.3",
+    "pandas==1.4.4"
 ]
 
 
