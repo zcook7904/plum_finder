@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "SF_plum_finder"
-version = "1.0.4"
+version = "1.0.7"
 authors = [
   { name="Zaven Cook", email="zavencook@gmail.com" },
 ]
@@ -18,20 +18,19 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "googlemaps==4.6.0",
-    "numpy==1.23.3",
-    "pandas==1.4.4"
+    "googlemaps",
+    "numpy",
+    "pandas"
 ]
-
 
 [project.urls]
 "Homepage" = "https://github.com/zcook7904/plum_finder"
 "Bug Tracker" = "https://github.com/zcook7904/plum_finder/issues"
 
-[tool.hatch.build]
-exclude = [
-    "venv",
-    "keys.txt",
-    "*/__pycache__",
-    "/.idea"
-]
+[tool.setuptools.packages.find]
+where = ["src"]  # ["."] by default
+exclude = ["venv", "keys.txt"]
+
+[tool.setuptools.package-data]
+"SF_plum_finder.data" = ["*.csv", "*.json"]
+
