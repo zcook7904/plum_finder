@@ -10,6 +10,10 @@ from numpy import nan
 from warnings import warn
 from math import sqrt
 from SF_plum_finder.API_handling import get_key, get_geolocation, create_client
+data_dir = os.path.join(os.path.dirname(__file__), 'data')
+
+
+# TODO get data to work in package
 
 error_dict = {
     490: 'Address should hold at least 3 components',
@@ -79,7 +83,7 @@ def format_street_name(street_name: str) -> str:
     return street_name
 
 
-def load_SF_streets(street_name_path: str = "src//SF_plum_finder//data//Street_Names.json"):
+def load_SF_streets(street_name_path: str = os.path.join(data_dir, 'Street_Names.json')):
     """Loads a json file containing all street names in SF and returns as a dict.
     Returns False if file cannot be loaded"""
     print(os.getcwd())
@@ -248,7 +252,7 @@ def find_closest_plum(user_address, n=10):
     # longitude = float(response['geometry']['location']['lng'])
 
     # load tree data
-    tree_data_path = os.path.join('src', 'SF_plum_finder', 'data', 'Plum_Street_Tree_List.csv')
+    tree_data_path = os.path.join(data_dir, 'Plum_Street_Tree_List.csv')
 
     try:
         data = pd.read_csv(tree_data_path).set_index(['TreeID'])
