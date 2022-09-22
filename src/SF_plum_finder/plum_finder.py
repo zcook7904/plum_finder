@@ -1,4 +1,4 @@
-"""plum_finder receives an address or intersection (i.e. 16th and Mission)
+"""SF_plum_finder receives an address or intersection (i.e. 16th and Mission)
 and returns the nearest plum tree to that location"""
 
 import json
@@ -133,7 +133,6 @@ def process_address(input_address):
     return address
 
 
-@timer_func
 def approximate_distance(data: pd.DataFrame, latitude: float, longitude: float) -> pd.DataFrame:
     """Adds the geometric distance from a given latitude and longitude to the street_tree_list data frame."""
 
@@ -296,10 +295,10 @@ def command_line_runner():
     CLI_address, CLI_n = get_cli_args()
     closest_plum = find_closest_plum(CLI_address, n=CLI_n)
 
-    if type(main_response) == int:
-        print(error_dict[main_response])
+    if type(closest_plum) == int:
+        print(error_dict[closest_plum])
     else:
-        print(main_response)
+        print(closest_plum)
 
 
 if __name__ == '__main__':

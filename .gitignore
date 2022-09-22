@@ -3,4 +3,5 @@ venv
 keys.txt
 */__pycache__
 /.idea
+dist/*
 

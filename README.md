@@ -1,4 +1,4 @@
-plumr
+SF_plum_finder
 ======
 
 A program that finds the nearest plum trees in San Francisco
@@ -8,20 +8,21 @@ Installation
 
 To install with pip, run:
 
-    pip install plumr
+    pip install SF_plum_finder
 
-TODO
-----------------
-Need method to automatically download data base from DataSF 
-and update the repo's db
+and then:
 
+`pip install -r requirements.txt`
 
-Data processing
-----------------
-data_process.py holds most tools to do basic querying of data. Other scripts in the data_processing folder were used to 
-originally further process the data or summarize it.
+to install dependencies
 
+Usage
+----------
+CLI usage can be achieved by entering:
 
+`python src/SF_plum_finder [street address in San Francisco]`
+
+in the working directory
 
 Contribute
 ----------
