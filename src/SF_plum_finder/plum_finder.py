@@ -6,9 +6,8 @@ import os
 from time import time
 import argparse
 import pandas as pd
-from numpy import nan
+import numpy as np
 from warnings import warn
-from math import sqrt
 from SF_plum_finder.API_handling import get_key, get_geolocation, create_client
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -141,20 +140,14 @@ def process_address(input_address):
 def approximate_distance(data: pd.DataFrame, latitude: float, longitude: float) -> pd.DataFrame:
     """Adds the geometric distance from a given latitude and longitude to the street_tree_list data frame."""
 
-    # function to map geometric distance
-    def geometric_distance_map(row):
-        row.geometric_distance = sqrt((row.Longitude - geometric_distance_map.longitude) ** 2
-                                      + (row.Latitude - geometric_distance_map.latitude) ** 2)
-        return row
+    # create numpy arrays for latitudes, longitude, and then compute distances from given latitude and longitude
+    latitudes = data.loc[:, 'Latitude'].values
+    longitudes = data.loc[:, 'Longitude'].values
+    geometric_distances = np.sqrt((latitudes - latitude) ** 2 + (longitudes - longitude) ** 2)
 
-    assigned_data = data.assign(geometric_distance=nan)
-    del data
-    geometric_distance_map.longitude = longitude
-    geometric_distance_map.latitude = latitude
+    data.insert(7, 'geometric_distance', geometric_distances)
 
-    mapped_data = assigned_data.apply(geometric_distance_map, axis='columns')
-
-    return mapped_data
+    return data
 
 
 def verify_closest(client, origin_address, destinations: list, mode: str = 'walking', sort: bool = True) -> list:
@@ -254,11 +247,18 @@ def find_closest_plum(user_address, n=10):
     # load tree data
     tree_data_path = os.path.join(data_dir, 'Plum_Street_Tree_List.csv')
 
-    try:
-        data = pd.read_csv(tree_data_path).set_index(['TreeID'])
-    except FileNotFoundError:
-        # tree data not found
-        return 593
+    def load_data(path):
+        try:
+            tree_data = pd.read_csv(path).set_index(['TreeID'])
+            return tree_data
+        except FileNotFoundError:
+            # tree data not found
+            return 593
+
+    data = load_data(tree_data_path)
+
+    if type(data) == int:
+        return data
 
     if data.empty:
         # tree data loaded incorrectly
@@ -292,7 +292,6 @@ def find_closest_plum(user_address, n=10):
     closest_tree = data.loc[data.qAddress == closest_address]
     closest_tree.street_distance = distances[0]['distance']
     response = return_tree(closest_tree)
-    time_taken = time() - start_time
     return response
 
 
