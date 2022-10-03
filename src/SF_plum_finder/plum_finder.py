@@ -12,10 +12,11 @@ from SF_plum_finder.API_handling import get_key, get_geolocation, create_client
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
 
-_test_case = '1468 Valencia St'
-_test_case = None
+_test_address = '1468 Valencia St'
+_test_address = None
 
-# TODO get data to work in package
+_test_n = 20
+
 
 error_dict = {
     490: 'Address should hold at least 3 components',
@@ -50,7 +51,7 @@ def timer_func(func):
 def _get_cli_args():
     """Argument parser for CLI"""
     parser = argparse.ArgumentParser(description='Get the location of the closest plum tree!')
-    parser.add_argument('-n', type=int, default=5,
+    parser.add_argument('-n', type=int, default=_test_n,
                         help='the number of potential closest trees to be sent to googlemaps. Max allowed: 25')
     parser.add_argument('address', nargs='+',
                         help='a street address located in San Francisco, CA')
@@ -161,7 +162,8 @@ def approximate_distance(data: pd.DataFrame, latitude: float, longitude: float) 
     return data
 
 
-def verify_closest(client, origin_address, destinations: list, mode: str = 'walking', sort: bool = True) -> list:
+def verify_closest(client, origin_address, destinations: list, mode: str = 'walking',
+                   sort: bool = True, distance_diff: bool = False) -> list | tuple:
     """verify which tree is actually closest walking-wise from Google Maps api call.
     Accepts Google Maps API key, a single origin, and a list of destinations. Origin and destinations can be in form
     of address or latitude and longitude. See Google Maps api docs.
@@ -184,12 +186,21 @@ def verify_closest(client, origin_address, destinations: list, mode: str = 'walk
     for i, tree in enumerate(response['rows'][0]['elements']):
         distances.append({'address': destinations[i], 'distance': tree['distance']['value']})
 
+    original_shortest_distance = distances[0]['distance']
+
     # sorting, if sort==True
     if sort:
         # sort function
         def by_distance(e): return e['distance']
 
         distances.sort(key=by_distance)
+
+    distance_difference = original_shortest_distance - distances[0]['distance']
+
+    # returns the difference between the geometrically closest tree and the
+    # geographically closest in geographical distance
+    if distance_diff:
+        return distances, distance_difference
 
     return distances
 
@@ -216,7 +227,7 @@ def open_last_response(path):
         print("Couldn't find file")
 
 
-def find_closest_plum(user_address: str | list, n=10):
+def find_closest_plum(user_address: str | list, n: int = _test_n, test_distance_diff: bool = False):
 
     # only allow up to 25 trees
     if n > 25:
@@ -290,8 +301,14 @@ def find_closest_plum(user_address: str | list, n=10):
         full_address = address + city_suffix
         destinations[i] = full_address
 
+    # query gmaps for sorted distance matrix of possible closest trees
+    # distance difference ives difference between approximate closest and actual closest
     try:
-        distances = verify_closest(gmaps, processed_address, destinations)
+        if test_distance_diff:
+            distances, distances_difference = verify_closest(gmaps, processed_address, destinations, distance_diff=True)
+        else:
+            distances = verify_closest(gmaps, processed_address, destinations)
+            distances_difference = None
     except ValueError:
         # API used incorrectly
         return 494
@@ -303,13 +320,16 @@ def find_closest_plum(user_address: str | list, n=10):
     closest_tree = data.loc[data.qAddress == closest_address]
     response = closest_tree.to_dict('list')
     response['street_distance'] = [distances[0]['distance']]
+
+    if distances_difference:
+        return response, distances_difference
     return response
 
 
 def command_line_runner(text_input=None):
     if text_input:
         CLI_address = text_input
-        CLI_n = 10
+        CLI_n = _test_n
     else:
         CLI_address, CLI_n = _get_cli_args()
 
@@ -326,8 +346,8 @@ def command_line_runner(text_input=None):
 
 if __name__ == '__main__':
 
-    if _test_case:
-        cheese = _test_case
+    if _test_address:
+        cheese = _test_address
         command_line_runner(text_input=cheese)
     else:
         command_line_runner()
