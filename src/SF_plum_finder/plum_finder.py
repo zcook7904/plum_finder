@@ -12,6 +12,9 @@ from SF_plum_finder.API_handling import get_key, get_geolocation, create_client
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
 
+_test_case = '1468 Valencia St'
+_test_case = None
+
 # TODO get data to work in package
 
 error_dict = {
@@ -44,7 +47,7 @@ def timer_func(func):
     return wrap_func
 
 
-def get_cli_args():
+def _get_cli_args():
     """Argument parser for CLI"""
     parser = argparse.ArgumentParser(description='Get the location of the closest plum tree!')
     parser.add_argument('-n', type=int, default=5,
@@ -82,10 +85,9 @@ def format_street_name(street_name: str) -> str:
     return street_name
 
 
-def load_SF_streets(street_name_path: str = os.path.join(data_dir, 'Street_Names.json')):
+def load_SF_streets(street_name_path: str = os.path.join(data_dir, 'Street_Names.json')) -> list | None:
     """Loads a json file containing all street names in SF and returns as a dict.
     Returns False if file cannot be loaded"""
-    print(os.getcwd())
 
     try:
         fp = open(street_name_path, 'r')
@@ -93,7 +95,7 @@ def load_SF_streets(street_name_path: str = os.path.join(data_dir, 'Street_Names
         fp.close()
         return acceptable_street_names
     except FileNotFoundError:
-        return False
+        return None
 
 
 def check_if_street_in_SF(acceptable_street_names, street: str) -> bool:
@@ -101,10 +103,19 @@ def check_if_street_in_SF(acceptable_street_names, street: str) -> bool:
     return street.casefold() in (name.casefold() for name in acceptable_street_names)
 
 
-def process_address(input_address):
+def _convert_add_to_list(input_address: str | list) -> list:
+    """Converts the inputted address to a list if it is in string form. Returns the address as a list"""
+    if type(input_address) == str:
+        input_address = input_address.split(' ')
+    return input_address
+
+
+def process_address(input_address: str | list):
     """ verify the user has given a real address and process the address into something manageable by
     the Google Maps api.
     Accepts list in format [number, street_name, stree_type] and returns string of full postal address"""
+    input_address = _convert_add_to_list(input_address)
+
     if not check_address_arg_length(input_address):
         return 490
 
@@ -183,16 +194,16 @@ def verify_closest(client, origin_address, destinations: list, mode: str = 'walk
     return distances
 
 
-def return_tree(closest_tree):
+def return_tree(closest_tree, input_address):
     # return the closest tree
-    address = closest_tree.qAddress.iloc[0]
-    species = closest_tree.qSpecies.iloc[0]
-    distance = closest_tree.street_distance
+    address = closest_tree['qAddress'][0]
+    species = closest_tree['qSpecies'][0]
+    distance = closest_tree['street_distance'][0]
 
-    response = """The closest tree:
+    response = """Closest tree to {}:
 Species: {}
 Address: {}
-Distance: {}m""".format(species, address, distance)
+Distance: {}m""".format(input_address, species, address, distance)
     return response
 
 
@@ -205,7 +216,7 @@ def open_last_response(path):
         print("Couldn't find file")
 
 
-def find_closest_plum(user_address, n=10):
+def find_closest_plum(user_address: str | list, n=10):
 
     # only allow up to 25 trees
     if n > 25:
@@ -290,20 +301,34 @@ def find_closest_plum(user_address, n=10):
 
     closest_address = distances[0]['address'][0:-len_city_suffix]
     closest_tree = data.loc[data.qAddress == closest_address]
-    closest_tree.street_distance = distances[0]['distance']
-    response = return_tree(closest_tree)
+    response = closest_tree.to_dict('list')
+    response['street_distance'] = [distances[0]['distance']]
     return response
 
 
-def command_line_runner():
-    CLI_address, CLI_n = get_cli_args()
+def command_line_runner(text_input=None):
+    if text_input:
+        CLI_address = text_input
+        CLI_n = 10
+    else:
+        CLI_address, CLI_n = _get_cli_args()
+
+    CLI_address = _convert_add_to_list(CLI_address)
     closest_plum = find_closest_plum(CLI_address, n=CLI_n)
 
     if type(closest_plum) == int:
         print(error_dict[closest_plum])
     else:
-        print(closest_plum)
+        address = ' '.join(CLI_address)
+        response = return_tree(closest_plum, address)
+        print(response)
 
 
 if __name__ == '__main__':
-    command_line_runner()
+
+    if _test_case:
+        cheese = _test_case
+        command_line_runner(text_input=cheese)
+    else:
+        command_line_runner()
+
