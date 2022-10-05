@@ -1,9 +1,9 @@
 # created by virtualenv automatically
 venv
-keys.txt
 */__pycache__
 */*/__pycache__
 dist
 .idea
 /src/SF_plum_finder.egg-info
 df
+config.ini

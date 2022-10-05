@@ -2,6 +2,7 @@
 and returns the nearest plum tree to that location"""
 
 import json
+import configparser
 import os
 from time import time
 import argparse
@@ -9,13 +10,28 @@ import pandas as pd
 import numpy as np
 from warnings import warn
 from SF_plum_finder.API_handling import get_key, get_geolocation, create_client
+from init_config import init_config_file
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
 
-_test_address = '1468 Valencia St'
-_test_address = None
+def load_config():
+    configparse = configparser.ConfigParser()
+    try:
+        configparse.read('config.ini')
+        return configparse
+    except FileNotFoundError:
+        print('Config file not found, creating one')
+        init_config_file()
+        return None
+    except configparser.Error as e:
+        print(f'Error with config file: {e}')
+        return None
 
-_test_n = 20
+
+config = load_config()
+_n = int(config['Settings']['n'])
+
+_test_address = '1468 Valencia St'
 
 
 error_dict = {
@@ -51,7 +67,7 @@ def timer_func(func):
 def _get_cli_args():
     """Argument parser for CLI"""
     parser = argparse.ArgumentParser(description='Get the location of the closest plum tree!')
-    parser.add_argument('-n', type=int, default=_test_n,
+    parser.add_argument('-n', type=int, default=_n,
                         help='the number of potential closest trees to be sent to googlemaps. Max allowed: 25')
     parser.add_argument('address', nargs='+',
                         help='a street address located in San Francisco, CA')
@@ -227,7 +243,7 @@ def open_last_response(path):
         print("Couldn't find file")
 
 
-def find_closest_plum(user_address: str | list, n: int = _test_n, test_distance_diff: bool = False):
+def find_closest_plum(user_address: str | list, key: str, n: int, test_distance_diff: bool = False):
 
     # only allow up to 25 trees
     if n > 25:
@@ -241,13 +257,8 @@ def find_closest_plum(user_address: str | list, n: int = _test_n, test_distance_
     if type(processed_address) == int:
         return processed_address
 
-    key_path = 'keys.txt'
     try:
-        keys = get_key(key_path)
-        gmaps = create_client(keys['GoogleAPIkey'])
-    except FileNotFoundError:
-        # Keys file not found
-        return 590
+        gmaps = create_client(key)
     except ValueError:
         # invalid API key used
         return 591
@@ -329,12 +340,12 @@ def find_closest_plum(user_address: str | list, n: int = _test_n, test_distance_
 def command_line_runner(text_input=None):
     if text_input:
         CLI_address = text_input
-        CLI_n = _test_n
+        CLI_n = _n
     else:
         CLI_address, CLI_n = _get_cli_args()
 
     CLI_address = _convert_add_to_list(CLI_address)
-    closest_plum = find_closest_plum(CLI_address, n=CLI_n)
+    closest_plum = find_closest_plum(CLI_address, config['Keys']['GoogleMaps'], n=CLI_n)
 
     if type(closest_plum) == int:
         print(error_dict[closest_plum])
@@ -345,10 +356,10 @@ def command_line_runner(text_input=None):
 
 
 if __name__ == '__main__':
-
-    if _test_address:
-        cheese = _test_address
-        command_line_runner(text_input=cheese)
-    else:
-        command_line_runner()
+    if config:
+        if _test_address:
+            cheese = _test_address
+            command_line_runner(text_input=cheese)
+        else:
+            command_line_runner()
 
