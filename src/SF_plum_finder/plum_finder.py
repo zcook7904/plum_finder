@@ -6,10 +6,11 @@ import configparser
 import os
 from time import time
 import argparse
+import csv
 import pandas as pd
 import numpy as np
 from warnings import warn
-from SF_plum_finder.API_handling import get_key, get_geolocation, create_client
+from SF_plum_finder.API_handling import get_geolocation, create_client
 from init_config import init_config_file
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -28,10 +29,14 @@ def load_config():
         return None
 
 
+# load config file and set config vars
 config = load_config()
 _n = int(config['Settings']['n'])
+performance_log = config['Settings'].getboolean('performancelog')
+use_SQL = config['Settings'].getboolean('usesql')
 
 _test_address = '1468 Valencia St'
+_test_address = None
 
 
 error_dict = {
@@ -47,8 +52,37 @@ error_dict = {
     592: 'Google Maps timed out',
     593: 'Tree data file not found',
     594: 'Tree data not loaded correctly'
-
 }
+
+
+def create_performance_log():
+    """Creates the header row of the performance log and saves the file in the working directory"""
+    header = ['InputAddress', 'InputLatitude', 'InputLongitude',
+              'ApproxTreeID', 'ApproxAddress', 'ApproxLatitude', 'ApproxLongitude',
+              'ActualTreeID', 'ActualAddress', 'ActualLatitude', 'ActualLongitude',
+              'DistanceDifference', 'SQLUsed', 'TotalTime']
+    try:
+        with open('performance_log.csv', 'x', newline='') as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(header)
+
+    except FileExistsError:
+        print('Performance log already exists')
+
+
+def write_to_log(row: list):
+    """Appends the performance log row to the performance log csv file"""
+    if not os.path.exists('performance_log.csv'):
+        print('No performance log found, creating one')
+        create_performance_log()
+        print(f'Performance log created at {os.path.abspath("performance_log.csv")}')
+
+    try:
+        with open('performance_log.csv', 'a', newline='') as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(row)
+    except FileNotFoundError:
+        print('Something has gone wrong with the performance logger')
 
 
 def timer_func(func):
@@ -213,7 +247,7 @@ def verify_closest(client, origin_address, destinations: list, mode: str = 'walk
 
     distance_difference = original_shortest_distance - distances[0]['distance']
 
-    # returns the difference between the geometrically closest tree and the
+    # returns the difference between the closest tree geometrically and the
     # geographically closest in geographical distance
     if distance_diff:
         return distances, distance_difference
@@ -249,8 +283,9 @@ def find_closest_plum(user_address: str | list, key: str, n: int, test_distance_
     if n > 25:
         print('Too many trees have been requested to query. Setting the number to 25')
         n = 25
+    if performance_log:
+        start_time = time()
 
-    start_time = time()
     processed_address = process_address(user_address)
 
     # if process_address raises an error code, return the code
@@ -302,9 +337,9 @@ def find_closest_plum(user_address: str | list, key: str, n: int, test_distance_
     data = approximate_distance(data, latitude, longitude)
 
     # get the n shortest distances and create a dict containing the addresses to send to gmaps
-    closest_trees = data.nsmallest(n, 'geometric_distance')
+    approx_closest_trees = data.nsmallest(n, 'geometric_distance')
 
-    destinations = closest_trees.qAddress.to_list()
+    destinations = approx_closest_trees.qAddress.to_list()
     city_suffix = ', San Francisco, CA'
     len_city_suffix = len(city_suffix)
 
@@ -315,11 +350,7 @@ def find_closest_plum(user_address: str | list, key: str, n: int, test_distance_
     # query gmaps for sorted distance matrix of possible closest trees
     # distance difference ives difference between approximate closest and actual closest
     try:
-        if test_distance_diff:
-            distances, distances_difference = verify_closest(gmaps, processed_address, destinations, distance_diff=True)
-        else:
-            distances = verify_closest(gmaps, processed_address, destinations)
-            distances_difference = None
+        distances, distances_difference = verify_closest(gmaps, processed_address, destinations, distance_diff=True)
     except ValueError:
         # API used incorrectly
         return 494
@@ -332,12 +363,27 @@ def find_closest_plum(user_address: str | list, key: str, n: int, test_distance_
     response = closest_tree.to_dict('list')
     response['street_distance'] = [distances[0]['distance']]
 
-    if distances_difference:
-        return response, distances_difference
+    # logging data for performance and usage monitoring
+    if performance_log:
+        total_time = time() - start_time
+        approx_closest_tree = approx_closest_trees.iloc[0, :]
+        closest_tree = closest_tree.iloc[0]
+        if isinstance(user_address, list):
+            user_address = ' '.join(user_address)
+
+        # creates row and appends it to performance_log.csv
+        log_row = [user_address, latitude, longitude,
+                   approx_closest_tree.name, approx_closest_tree.loc['Latitude'], approx_closest_tree.loc['Longitude'],
+                   closest_tree.name, closest_tree.loc['Latitude'], closest_tree.loc['Longitude'],
+                   distances_difference, use_SQL, total_time]
+
+        write_to_log(log_row)
+
     return response
 
 
 def command_line_runner(text_input=None):
+    """Runs the command line interface. Prints out the results from find_closest_plum"""
     if text_input:
         CLI_address = text_input
         CLI_n = _n
@@ -362,4 +408,3 @@ if __name__ == '__main__':
             command_line_runner(text_input=cheese)
         else:
             command_line_runner()
-

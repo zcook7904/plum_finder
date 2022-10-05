@@ -6,7 +6,7 @@ import googlemaps
 
 
 def get_key(path: str):
-    """ accepts the path as a string and returns a dictionary containing all of the keys for the program
+    """**deprecated** accepts the path as a string and returns a dictionary containing all of the keys for the program
     in the format: {"CompanyAPIkey": "key_as_string"}"""
 
     try:

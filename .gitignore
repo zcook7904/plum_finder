@@ -7,3 +7,4 @@ dist
 /src/SF_plum_finder.egg-info
 df
 config.ini
+performance_log.csv
