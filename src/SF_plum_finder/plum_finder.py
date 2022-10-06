@@ -85,6 +85,7 @@ def write_to_log(row: list):
         print('Something has gone wrong with the performance logger')
 
 
+# TODO Implement geocoding through SF address list
 def timer_func(func):
     # This function shows the execution time of
     # the function object passed
@@ -154,18 +155,18 @@ def check_if_street_in_SF(acceptable_street_names, street: str) -> bool:
     return street.casefold() in (name.casefold() for name in acceptable_street_names)
 
 
-def _convert_add_to_list(input_address: str | list) -> list:
+def _convert_address_to_list(input_address: str | list) -> list:
     """Converts the inputted address to a list if it is in string form. Returns the address as a list"""
     if type(input_address) == str:
         input_address = input_address.split(' ')
     return input_address
 
 
-def process_address(input_address: str | list):
+def process_address(input_address: str | list, add_city: bool = True) -> str | int:
     """ verify the user has given a real address and process the address into something manageable by
     the Google Maps api.
     Accepts list in format [number, street_name, stree_type] and returns string of full postal address"""
-    input_address = _convert_add_to_list(input_address)
+    input_address = _convert_address_to_list(input_address)
 
     if not check_address_arg_length(input_address):
         return 490
@@ -194,9 +195,33 @@ def process_address(input_address: str | list):
         return 493
 
     # join everything together and return
-    city_address = 'SAN FRANCISCO, CA'
-    address = street_number + ' ' + street + ', ' + city_address
+    address = street_number + ' ' + street
+
+    # adds city suffix by default
+    if add_city:
+        city_address = 'SAN FRANCISCO, CA'
+        address = address + ', ' + city_address
+
     return address
+
+
+@timer_func
+def get_geocode_from_db(user_address):
+    """Gets the users geocode from the SF address database."""
+    pass
+
+
+@timer_func
+def get_user_geolocation(gmaps, processed_address: str):
+    try:
+        latitude, longitude = get_geolocation(gmaps, processed_address)
+        return latitude, longitude
+    except ValueError:
+        # API used incorrectly
+        return 494
+    except RuntimeError:
+        # timed out
+        return 592
 
 
 def approximate_distance(data: pd.DataFrame, latitude: float, longitude: float) -> pd.DataFrame:
@@ -277,7 +302,7 @@ def open_last_response(path):
         print("Couldn't find file")
 
 
-def find_closest_plum(user_address: str | list, key: str, n: int, test_distance_diff: bool = False):
+def find_closest_plum(user_address: str | list, key: str, n: int):
 
     # only allow up to 25 trees
     if n > 25:
@@ -299,14 +324,13 @@ def find_closest_plum(user_address: str | list, key: str, n: int, test_distance_
         return 591
 
     # user's geographic location
-    try:
-        latitude, longitude = get_geolocation(gmaps, processed_address)
-    except ValueError:
-        # API used incorrectly
-        return 494
-    except RuntimeError:
-        # timed out
-        return 592
+    geocode = get_user_geolocation(gmaps, processed_address)
+
+    # return error if occurs
+    if isinstance(geocode, int):
+        return geocode
+
+    latitude, longitude = geocode
 
     # response = open_last_response('test.json')
     # latitude = float(response['geometry']['location']['lat'])
@@ -390,7 +414,7 @@ def command_line_runner(text_input=None):
     else:
         CLI_address, CLI_n = _get_cli_args()
 
-    CLI_address = _convert_add_to_list(CLI_address)
+    CLI_address = _convert_address_to_list(CLI_address)
     closest_plum = find_closest_plum(CLI_address, config['Keys']['GoogleMaps'], n=CLI_n)
 
     if type(closest_plum) == int:
