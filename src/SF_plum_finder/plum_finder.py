@@ -339,6 +339,9 @@ def find_closest_plum(user_address: str | list, key: str, n: int):
     # load tree data
     tree_data_path = os.path.join(data_dir, 'Plum_Street_Tree_List.csv')
 
+    # TODO load data while getting geocode/processing address? call at top and retrieve here
+    # also move this to single function that ends...
+    @timer_func
     def load_data(path):
         try:
             tree_data = pd.read_csv(path).set_index(['TreeID'])
@@ -346,8 +349,6 @@ def find_closest_plum(user_address: str | list, key: str, n: int):
         except FileNotFoundError:
             # tree data not found
             return 593
-
-    data = load_data(tree_data_path)
 
     if type(data) == int:
         return data
@@ -358,6 +359,8 @@ def find_closest_plum(user_address: str | list, key: str, n: int):
 
     # add distance from inputted address to data frame
     data.drop_duplicates('qAddress', inplace=True)
+
+    # ...here
     data = approximate_distance(data, latitude, longitude)
 
     # get the n shortest distances and create a dict containing the addresses to send to gmaps
