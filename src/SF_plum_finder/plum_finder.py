@@ -10,9 +10,9 @@ import argparse
 import csv
 import pandas as pd
 import numpy as np
-from warnings import warn
 from SF_plum_finder.API_handling import get_geolocation, create_client
-from init_config import init_config_file
+from SF_plum_finder.init_config import init_config_file
+
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
 
