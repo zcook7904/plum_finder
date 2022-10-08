@@ -2,6 +2,7 @@
 venv
 */__pycache__
 */*/__pycache__
+src/SF_plum_finder/__pycache__
 dist
 .idea
 /src/SF_plum_finder.egg-info
