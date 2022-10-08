@@ -66,29 +66,29 @@ class Address:
             # timed out
             return 592
 
+    def set_geocode_from_db(self):
+        """Gets the users geocode from the SF address database."""
+        pass
+
 
 def load_config():
     configparse = configparser.ConfigParser()
+    if not os.path.exists('config.ini'):
+        init_config_file()
+        path = os.path.abspath('config.ini')
+        print(f'Config file not found, creating new one at {path}.')
+        print('You will need to add your google maps key to the config file')
+        return None
+
     try:
         configparse.read('config.ini')
         return configparse
     except FileNotFoundError:
-        print('Config file not found, creating one')
-        init_config_file()
+        print('Config file not found')
         return None
     except configparser.Error as e:
         print(f'Error with config file: {e}')
         return None
-
-
-# load config file and set config vars
-config = load_config()
-_n = int(config['Settings']['n'])
-performance_log = config['Settings'].getboolean('performancelog')
-use_SQL = config['Settings'].getboolean('usesql')
-
-_test_address = '1468 Valencia St'
-_test_address = None
 
 
 error_dict = {
@@ -103,7 +103,8 @@ error_dict = {
     591: 'Invalid Google Maps API Key',
     592: 'Google Maps timed out',
     593: 'Tree data file not found',
-    594: 'Tree data not loaded correctly'
+    594: 'Tree data not loaded correctly',
+    595: 'Config file not found'
 }
 
 
@@ -155,13 +156,11 @@ def timer_func(func):
 def _get_cli_args():
     """Argument parser for CLI. Returns address args as a string"""
     parser = argparse.ArgumentParser(description='Get the location of the closest plum tree!')
-    parser.add_argument('-n', type=int, default=_n,
-                        help='the number of potential closest trees to be sent to googlemaps. Max allowed: 25')
     parser.add_argument('address', nargs='+',
                         help='a street address located in San Francisco, CA')
     args = parser.parse_args()
     address = ' '.join(args.address)
-    return address, args.n
+    return address
 
 
 def check_address_arg_length(address: Address) -> bool:
@@ -213,7 +212,7 @@ def check_if_street_in_SF(acceptable_street_names, address: Address) -> bool:
     return address.get_street_name().casefold() in (name.casefold() for name in acceptable_street_names)
 
 
-def process_address(address: Address, add_city: bool = True) -> Address | int:
+def process_address(address: Address) -> Address | int:
     """ verify the user has given a real address and process the address into something manageable by
     the Google Maps api.
     Accepts list in format [number, street_name, stree_type] and returns string of full postal address"""
@@ -238,12 +237,6 @@ def process_address(address: Address, add_city: bool = True) -> Address | int:
         return 493
 
     return address
-
-
-@timer_func
-def get_geocode_from_db(user_address):
-    """Gets the users geocode from the SF address database."""
-    pass
 
 
 @timer_func
@@ -325,7 +318,14 @@ def open_last_response(path):
         print("Couldn't find file")
 
 
-def find_closest_plum(input_address: str, key: str, n: int):
+def find_closest_plum(input_address: str, config):
+
+    # Set config vars
+    key = config['Keys']['GoogleMaps']
+
+    n = int(config['Settings']['n'])
+    performance_log = config['Settings'].getboolean('performancelog')
+    use_SQL = config['Settings'].getboolean('usesql')
 
     # only allow up to 25 trees
     if n > 25:
@@ -414,15 +414,14 @@ def find_closest_plum(input_address: str, key: str, n: int):
     return response
 
 
-def command_line_runner(text_input=None):
+def command_line_runner(config, text_input=None):
     """Runs the command line interface. Prints out the results from find_closest_plum"""
     if text_input:
         CLI_address = text_input
-        CLI_n = _n
     else:
-        CLI_address, CLI_n = _get_cli_args()
+        CLI_address = _get_cli_args()
 
-    closest_plum = find_closest_plum(CLI_address, config['Keys']['GoogleMaps'], n=CLI_n)
+    closest_plum = find_closest_plum(CLI_address, config)
 
     if type(closest_plum) == int:
         print(error_dict[closest_plum])
@@ -445,9 +444,8 @@ Distance: {}m""".format(input_address, species, address, distance)
 
 
 if __name__ == '__main__':
-    if config:
-        if _test_address:
-            cheese = _test_address
-            command_line_runner(text_input=cheese)
-        else:
-            command_line_runner()
+    plum_finder_config = load_config()
+    if plum_finder_config:
+        command_line_runner(plum_finder_config)
+    else:
+        print(error_dict[plum_finder_config])
