@@ -7,9 +7,9 @@ import os
 from dataclasses import dataclass
 from time import time
 import argparse
-import csv
+from csv import writer as csv_writer
 import pandas as pd
-import numpy as np
+from numpy import sqrt
 from SF_plum_finder.API_handling import get_geolocation, create_client
 from SF_plum_finder.init_config import init_config_file
 
@@ -66,9 +66,14 @@ class Address:
             # timed out
             return 592
 
-    def set_geocode_from_db(self):
+    def set_geocode_from_addresses(self, address_df: pd.DataFrame):
         """Gets the users geocode from the SF address database."""
-        pass
+        if self.street_address.upper() in address_df.loc[:, 'Address'].to_list():
+            self.latitude = address_df.loc[address_df.Address == self.street_address.upper()].Latitude.iloc[0]
+            self.longitude = address_df.loc[address_df.Address == self.street_address.upper()].Longitude.iloc[0]
+            return True
+        else:
+            return None
 
 
 def load_config():
@@ -116,7 +121,7 @@ def create_performance_log():
               'DistanceDifference', 'SQLUsed', 'TotalTime']
     try:
         with open('performance_log.csv', 'x', newline='') as csv_file:
-            writer = csv.writer(csv_file)
+            writer = csv_writer(csv_file)
             writer.writerow(header)
             return True
 
@@ -133,7 +138,7 @@ def write_to_log(row: list):
 
     try:
         with open('performance_log.csv', 'a', newline='') as csv_file:
-            writer = csv.writer(csv_file)
+            writer = csv_writer(csv_file)
             writer.writerow(row)
     except FileNotFoundError:
         print('Something has gone wrong with the performance logger')
@@ -161,6 +166,15 @@ def _get_cli_args():
     args = parser.parse_args()
     address = ' '.join(args.address)
     return address
+
+
+def load_addresses(path: str):
+    try:
+        address_data = pd.read_csv(path)
+    except FileNotFoundError:
+        # tree data not found
+        return 593
+    return address_data
 
 
 def check_address_arg_length(address: Address) -> bool:
@@ -239,7 +253,6 @@ def process_address(address: Address) -> Address | int:
     return address
 
 
-@timer_func
 def load_tree_data(path: str):
     """Loads the Plum_Street_Tree_List.csv file into a pandas dataframe and returns it"""
     try:
@@ -247,16 +260,16 @@ def load_tree_data(path: str):
     except FileNotFoundError:
         # tree data not found
         return 593
-    
+
     if tree_data.empty:
         # tree data loaded incorrectly
         return 594
-    
+
     # only need one tree per address
     tree_data.drop_duplicates('qAddress', inplace=True)
-    
+
     return tree_data
-            
+
 
 def approximate_distance(data: pd.DataFrame, origin_address: Address) -> pd.DataFrame:
     """Adds the geometric distance from a given latitude and longitude to the street_tree_list data frame."""
@@ -264,8 +277,8 @@ def approximate_distance(data: pd.DataFrame, origin_address: Address) -> pd.Data
     # create numpy arrays for latitudes, longitude, and then compute distances from given latitude and longitude
     latitudes = data.loc[:, 'Latitude'].values
     longitudes = data.loc[:, 'Longitude'].values
-    geometric_distances = np.sqrt((latitudes - origin_address.latitude) ** 2
-                                  + (longitudes - origin_address.longitude) ** 2)
+    geometric_distances = sqrt((latitudes - origin_address.latitude) ** 2
+                               + (longitudes - origin_address.longitude) ** 2)
 
     data.insert(7, 'geometric_distance', geometric_distances)
 
@@ -319,7 +332,6 @@ def open_last_response(path):
 
 
 def find_closest_plum(input_address: str, config):
-
     # Set config vars
     key = config['Keys']['GoogleMaps']
 
@@ -348,22 +360,28 @@ def find_closest_plum(input_address: str, config):
         # invalid API key used
         return 591
 
-    # sets user's geographic location
-    try:
-        user_address.set_geolocation(gmaps)
+    address_data_path = os.path.join(data_dir, 'Addresses.csv')
+    addresses = load_addresses(address_data_path)
+    geocode_set = user_address.set_geocode_from_addresses(addresses)
 
-    except ValueError:
-        # API used incorrectly
-        return 494
-    except RuntimeError:
-        # timed out
-        return 592
+    if not geocode_set:
+        print('Failed to set geocode from db')
+        # sets user's geographic location
+        try:
+            user_address.set_geolocation(gmaps)
+
+        except ValueError:
+            # API used incorrectly
+            return 494
+        except RuntimeError:
+            # timed out
+            return 592
 
     # load tree data
     # may make this async in future
     tree_data_path = os.path.join(data_dir, 'Plum_Street_Tree_List.csv')
     tree_data = load_tree_data(tree_data_path)
-    
+
     if type(tree_data) == int:
         return tree_data
 
@@ -392,9 +410,12 @@ def find_closest_plum(input_address: str, config):
         # timed out
         return 592
 
+    # get address from sorted list
     closest_address = distances[0]['address'][0:-len_city_suffix]
     closest_tree = tree_data.loc[tree_data.qAddress == closest_address]
     response = closest_tree.to_dict('list')
+
+    # adding the walking distance
     response['street_distance'] = [distances[0]['distance']]
 
     # logging data for performance and usage monitoring

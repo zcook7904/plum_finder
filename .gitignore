@@ -9,3 +9,5 @@ dist
 df
 config.ini
 performance_log.csv
+profile.txt
+*.prof
