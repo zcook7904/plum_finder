@@ -10,6 +10,20 @@ To install with pip, run:
 
     pip install SF_plum_finder
 
+Config
+------------
+To use the plum finder, a config file must be generated in the working directory. 
+This is generated automatically by running the program the first time. 
+
+### Keys
+Google maps: an appropriate google maps API key must be stored here
+
+### Settings
+n: number of possible closest trees to be sent to gmaps; max = 25
+usesql: not currently implemented
+performance_log: logs parameters regarding the performance and entered data for each call to find_closest_plum if 
+yes or True
+
 
 Usage
 ----------

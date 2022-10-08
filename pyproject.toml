@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SF_plum_finder"
-version = "1.0.3"
+version = "1.1.0"
 authors = [
   { name="Zaven Cook", email="zavencook@gmail.com" },
 ]
@@ -29,7 +29,7 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["src"]  # ["."] by default
-exclude = ["venv", "config.ini"]
+exclude = ["venv", "config.ini", "performance_log.csv"]
 
 [tool.setuptools.package-data]
 "SF_plum_finder.data" = ["*.csv", "*.json"]
