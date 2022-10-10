@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from time import time
 import argparse
 from csv import writer as csv_writer
+import sqlite3
 import pandas as pd
 from numpy import sqrt
 from SF_plum_finder.API_handling import get_geolocation, create_client
@@ -36,24 +37,28 @@ class Address:
         address_list = self.street_address.split(' ')
         return address_list
 
-    def get_number(self):
+    @property
+    def street_number(self):
         return int(self.get_address_as_list()[0])
 
-    def get_street_name(self):
+    @property
+    def street_name(self):
         return ' '.join(self.get_address_as_list()[1:])
 
     def get_full_address(self):
         return f'{self.street_address}, {self.city}'
 
-    def set_number(self, new_number: int):
-        street_name = self.get_street_name()
+    @street_number.setter
+    def street_number(self, new_number: int):
+        street_name = self.street_name
         self.street_address = f'{new_number} {street_name}'
 
-    def set_street_name(self, new_name: str):
-        street_number = self.get_number()
+    @street_name.setter
+    def street_name(self, new_name: str):
+        street_number = self.street_number
         self.street_address = f'{street_number} {new_name}'
 
-    def set_geolocation(self, gmaps):
+    def set_geolocation_from_gmaps(self, gmaps):
         """Get the geolocation of the address"""
         try:
             latitude, longitude = get_geolocation(gmaps, self.get_full_address())
@@ -66,11 +71,17 @@ class Address:
             # timed out
             return 592
 
-    def set_geocode_from_addresses(self, address_df: pd.DataFrame):
+    def set_geocode_from_db(self, db_connection):
         """Gets the users geocode from the SF address database."""
-        if self.street_address.upper() in address_df.loc[:, 'Address'].to_list():
-            self.latitude = address_df.loc[address_df.Address == self.street_address.upper()].Latitude.iloc[0]
-            self.longitude = address_df.loc[address_df.Address == self.street_address.upper()].Longitude.iloc[0]
+        query = f"""
+                SELECT Longitude, Latitude
+                FROM addresses
+                WHERE Address = '{self.street_address.upper()}'"""
+        address_df = pd.read_sql(query, db_connection)
+
+        if address_df.size > 0:
+            self.latitude = address_df.Latitude[0]
+            self.longitude = address_df.Longitude[0]
             return True
         else:
             return None
@@ -118,7 +129,7 @@ def create_performance_log():
     header = ['InputAddress', 'InputLatitude', 'InputLongitude',
               'ApproxTreeID', 'ApproxAddress', 'ApproxLatitude', 'ApproxLongitude',
               'ActualTreeID', 'ActualAddress', 'ActualLatitude', 'ActualLongitude',
-              'DistanceDifference', 'SQLUsed', 'TotalTime']
+              'DistanceDifference', 'UseSQL', 'SQL_Used', 'TotalTime']
     try:
         with open('performance_log.csv', 'x', newline='') as csv_file:
             writer = csv_writer(csv_file)
@@ -144,7 +155,6 @@ def write_to_log(row: list):
         print('Something has gone wrong with the performance logger')
 
 
-# TODO Implement geocoding through SF address list
 def timer_func(func):
     # This function shows the execution time of
     # the function object passed
@@ -168,15 +178,6 @@ def _get_cli_args():
     return address
 
 
-def load_addresses(path: str):
-    try:
-        address_data = pd.read_csv(path)
-    except FileNotFoundError:
-        # tree data not found
-        return 593
-    return address_data
-
-
 def check_address_arg_length(address: Address) -> bool:
     """ Returns false if the input address doesn't have at least 3 components"""
     arg_length = len(address)
@@ -192,7 +193,7 @@ def check_street_number(address: Address) -> bool:
     # ensure first input is an integer
     try:
         # should throw value error if street number cannot be returned
-        address.get_number()
+        isinstance(address.street_number, int)
         return True
     except ValueError:
         return False
@@ -200,10 +201,10 @@ def check_street_number(address: Address) -> bool:
 
 def format_street_name(address: Address) -> Address:
     """adds '0' to street name if street name is numeric, <10, and doesn't contain '0' (ex 9th st -> 09th st)"""
-    street_name = address.get_street_name()
+    street_name = address.street_name
     if street_name[0].isnumeric() and not street_name[1].isnumeric():
         new_street_name = '0' + street_name
-        address.set_street_name(new_street_name)
+        address.street_name = new_street_name
     return address
 
 
@@ -220,10 +221,10 @@ def load_SF_streets(street_name_path: str = os.path.join(data_dir, 'Street_Names
         return None
 
 
-def check_if_street_in_SF(acceptable_street_names, address: Address) -> bool:
+def check_if_street_in_SF(acceptable_street_names: list[str], address: Address) -> bool:
     """Returns True if the street name is in the SF street name list"""
 
-    return address.get_street_name().casefold() in (name.casefold() for name in acceptable_street_names)
+    return address.street_name.casefold() in (name.casefold() for name in acceptable_street_names)
 
 
 def process_address(address: Address) -> Address | int:
@@ -251,6 +252,18 @@ def process_address(address: Address) -> Address | int:
         return 493
 
     return address
+
+
+def create_db_connection(db_path: str):
+    """ create a database connection to a SQLite database """
+    conn = None
+    try:
+        conn = sqlite3.connect(db_path)
+    except sqlite3.Error as e:
+        print(e)
+    finally:
+        if conn:
+            return conn
 
 
 def load_tree_data(path: str):
@@ -360,15 +373,17 @@ def find_closest_plum(input_address: str, config):
         # invalid API key used
         return 591
 
-    address_data_path = os.path.join(data_dir, 'Addresses.csv')
-    addresses = load_addresses(address_data_path)
-    geocode_set = user_address.set_geocode_from_addresses(addresses)
+    geocode_set = False
+
+    if use_SQL:
+        db_connection = create_db_connection(os.path.join(data_dir, 'Addresses.db'))
+        geocode_set = user_address.set_geocode_from_db(db_connection)
 
     if not geocode_set:
-        print('Failed to set geocode from db')
+        SQL_used = False
         # sets user's geographic location
         try:
-            user_address.set_geolocation(gmaps)
+            user_address.set_geolocation_from_gmaps(gmaps)
 
         except ValueError:
             # API used incorrectly
@@ -376,6 +391,8 @@ def find_closest_plum(input_address: str, config):
         except RuntimeError:
             # timed out
             return 592
+    else:
+        SQL_used = True
 
     # load tree data
     # may make this async in future
@@ -428,7 +445,7 @@ def find_closest_plum(input_address: str, config):
         log_row = [user_address.street_address, user_address.latitude, user_address.longitude,
                    approx_closest_tree.name, approx_closest_tree.loc['Latitude'], approx_closest_tree.loc['Longitude'],
                    closest_tree.name, closest_tree.loc['Latitude'], closest_tree.loc['Longitude'],
-                   distances_difference, use_SQL, total_time]
+                   distances_difference, use_SQL, SQL_used, total_time]
 
         write_to_log(log_row)
 
