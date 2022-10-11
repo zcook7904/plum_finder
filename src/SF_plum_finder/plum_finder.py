@@ -228,16 +228,18 @@ def _get_cli_args():
     return address
 
 
-def load_SF_streets(street_name_path: str = os.path.join(data_dir, 'Street_Names.json')) -> list | None:
-    """Loads a json file containing all street names in SF and returns as a dict.
-    Returns False if file cannot be loaded"""
+def load_SF_streets(db_connection) -> list | None:
+    """Creates a list containing all street names in SF from the SF address db."""
 
-    try:
-        fp = open(street_name_path, 'r')
-        acceptable_street_names = json.load(fp)
-        fp.close()
+    acceptable_street_names = (pd.read_sql("""SELECT Street FROM addresses GROUP BY Street""", db_connection)
+                               .Street.to_list())
+    if acceptable_street_names:
+        # remove none type
+        for i, street in enumerate(acceptable_street_names):
+            if not isinstance(street, str):
+                acceptable_street_names.pop(i)
         return acceptable_street_names
-    except FileNotFoundError:
+    else:
         return None
 
 
@@ -339,6 +341,8 @@ def find_closest_plum(input_address: str, config):
     performance_log = config['Settings'].getboolean('performancelog')
     use_SQL = config['Settings'].getboolean('usesql')
 
+    geocode_set = False
+
     # only allow up to 25 trees
     if n > 25:
         print('Too many trees have been requested to query. Setting the number to 25')
@@ -348,28 +352,26 @@ def find_closest_plum(input_address: str, config):
 
     user_address = Address(input_address)
 
-    # load json containing all street names in SF
-    SF_streets = load_SF_streets()
-    if not SF_streets:
-        # file unable to load
-        return 492
+    # load list containing all street names in SF
+    with create_db_connection(os.path.join(data_dir, 'Addresses.db')) as db_connection:
+        SF_streets = load_SF_streets(db_connection)
+        if not SF_streets:
+            # file unable to load
+            return 492
 
-    process_address_status = user_address.process_address(SF_streets)
+        process_address_status = user_address.process_address(SF_streets)
 
-    if isinstance(process_address_status, int):
-        return process_address_status
+        if isinstance(process_address_status, int):
+            return process_address_status
+
+        if use_SQL:
+            geocode_set = user_address.set_geocode_from_db(db_connection)
 
     try:
         gmaps = create_client(key)
     except ValueError:
         # invalid API key used
         return 591
-
-    geocode_set = False
-
-    if use_SQL:
-        with create_db_connection(os.path.join(data_dir, 'Addresses.db')) as db_connection:
-            geocode_set = user_address.set_geocode_from_db(db_connection)
 
     if not geocode_set:
         SQL_used = False
