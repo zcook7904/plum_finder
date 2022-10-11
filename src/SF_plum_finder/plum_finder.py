@@ -58,6 +58,56 @@ class Address:
         street_number = self.street_number
         self.street_address = f'{street_number} {new_name}'
 
+    def check_address_arg_length(self) -> bool:
+        """ Returns false if the input address doesn't have at least 3 components"""
+        arg_length = len(self)
+        # make sure input is correct length, max 10 is arb...
+        if arg_length < 3 or arg_length > 10:
+            # Address should contain {number} {street_name} {street_suffix} at minimum
+            return False
+        return True
+
+    def check_street_number(self) -> bool:
+        """ Returns True if the street number is valid"""
+        # ensure first input is an integer
+        try:
+            # should throw value error if street number cannot be returned
+            isinstance(self.street_number, int)
+            return True
+        except ValueError:
+            return False
+
+    def format_street_name(self):
+        """adds '0' to street name if street name is numeric, <10, and doesn't contain '0' (ex 9th st -> 09th st)"""
+        street_name = self.street_name
+        if street_name[0].isnumeric() and not street_name[1].isnumeric():
+            new_street_name = '0' + street_name
+            self.street_name = new_street_name
+        return True
+
+    def check_if_street_in_SF(self, acceptable_street_names: list[str]) -> bool:
+        """Returns True if the street name is in the SF street name list"""
+
+        return self.street_name.casefold() in (name.casefold() for name in acceptable_street_names)
+
+    def process_address(self, SF_streets: list[str]):
+        """ verify the user has given a real address and process the address into something manageable by
+        the Google Maps api.
+        Accepts list in format [number, street_name, stree_type] and returns string of full postal address"""
+
+        if not self.check_address_arg_length():
+            return 490
+
+        if not self.check_street_number():
+            return 491
+
+        # clean up street name
+        self.format_street_name()
+
+        if not self.check_if_street_in_SF(SF_streets):
+            # street
+            return 493
+
     def set_geolocation_from_gmaps(self, gmaps):
         """Get the geolocation of the address"""
         try:
@@ -178,36 +228,6 @@ def _get_cli_args():
     return address
 
 
-def check_address_arg_length(address: Address) -> bool:
-    """ Returns false if the input address doesn't have at least 3 components"""
-    arg_length = len(address)
-    # make sure input is correct length, max 10 is arb...
-    if arg_length < 3 or arg_length > 10:
-        # Address should contain {number} {street_name} {street_suffix} at minimum
-        return False
-    return True
-
-
-def check_street_number(address: Address) -> bool:
-    """ Returns True if the street number is valid"""
-    # ensure first input is an integer
-    try:
-        # should throw value error if street number cannot be returned
-        isinstance(address.street_number, int)
-        return True
-    except ValueError:
-        return False
-
-
-def format_street_name(address: Address) -> Address:
-    """adds '0' to street name if street name is numeric, <10, and doesn't contain '0' (ex 9th st -> 09th st)"""
-    street_name = address.street_name
-    if street_name[0].isnumeric() and not street_name[1].isnumeric():
-        new_street_name = '0' + street_name
-        address.street_name = new_street_name
-    return address
-
-
 def load_SF_streets(street_name_path: str = os.path.join(data_dir, 'Street_Names.json')) -> list | None:
     """Loads a json file containing all street names in SF and returns as a dict.
     Returns False if file cannot be loaded"""
@@ -219,39 +239,6 @@ def load_SF_streets(street_name_path: str = os.path.join(data_dir, 'Street_Names
         return acceptable_street_names
     except FileNotFoundError:
         return None
-
-
-def check_if_street_in_SF(acceptable_street_names: list[str], address: Address) -> bool:
-    """Returns True if the street name is in the SF street name list"""
-
-    return address.street_name.casefold() in (name.casefold() for name in acceptable_street_names)
-
-
-def process_address(address: Address) -> Address | int:
-    """ verify the user has given a real address and process the address into something manageable by
-    the Google Maps api.
-    Accepts list in format [number, street_name, stree_type] and returns string of full postal address"""
-
-    if not check_address_arg_length(address):
-        return 490
-
-    if not check_street_number(address):
-        return 491
-
-    # clean up street name
-    address = format_street_name(address)
-
-    # load json containing all street names in SF
-    acceptable_streets = load_SF_streets()
-    if not acceptable_streets:
-        # file unable to load
-        return 492
-
-    if not check_if_street_in_SF(acceptable_streets, address):
-        # street
-        return 493
-
-    return address
 
 
 def create_db_connection(db_path: str):
@@ -336,7 +323,7 @@ def verify_closest(gmaps, origin_address: Address, destinations: list, mode: str
 
 
 def open_last_response(path):
-    # opens the last response for testing
+    """opens the last response for testing. Deprecated"""
     try:
         with open(path, 'r') as file:
             return json.load(file)[0]
@@ -361,11 +348,16 @@ def find_closest_plum(input_address: str, config):
 
     user_address = Address(input_address)
 
-    user_address = process_address(user_address)
+    # load json containing all street names in SF
+    SF_streets = load_SF_streets()
+    if not SF_streets:
+        # file unable to load
+        return 492
 
-    # if process_address raises an error code, return the code
-    if type(user_address) == int:
-        return user_address
+    process_address_status = user_address.process_address(SF_streets)
+
+    if isinstance(process_address_status, int):
+        return process_address_status
 
     try:
         gmaps = create_client(key)
@@ -376,8 +368,8 @@ def find_closest_plum(input_address: str, config):
     geocode_set = False
 
     if use_SQL:
-        db_connection = create_db_connection(os.path.join(data_dir, 'Addresses.db'))
-        geocode_set = user_address.set_geocode_from_db(db_connection)
+        with create_db_connection(os.path.join(data_dir, 'Addresses.db')) as db_connection:
+            geocode_set = user_address.set_geocode_from_db(db_connection)
 
     if not geocode_set:
         SQL_used = False
