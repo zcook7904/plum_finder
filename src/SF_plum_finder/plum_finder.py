@@ -3,6 +3,7 @@ and returns the nearest plum tree to that location"""
 
 import json
 import configparser
+import logging
 import os
 from dataclasses import dataclass
 from time import time
@@ -338,6 +339,10 @@ def find_closest_plum(input_address: str, config):
     n = int(config['Settings']['n'])
     performance_log = config['Settings'].getboolean('performancelog')
     use_SQL = config['Settings'].getboolean('usesql')
+
+    global data_dir
+    data_dir = os.path.join(os.path.dirname(__file__), 'data')
+    logging.debug(f'Data dir: {data_dir}')
 
     geocode_set = False
 
