@@ -3,6 +3,7 @@ venv
 */__pycache__
 */*/__pycache__
 src/SF_plum_finder/__pycache__
+src/SF_plum_finder/data/Plum_Street_Tree_List.csv
 dist
 .idea
 /src/SF_plum_finder.egg-info

@@ -228,19 +228,17 @@ def _get_cli_args():
     return address
 
 
-def load_SF_streets(db_connection) -> list | None:
-    """Creates a list containing all street names in SF from the SF address db."""
-
-    acceptable_street_names = (pd.read_sql("""SELECT Street FROM addresses GROUP BY Street""", db_connection)
-                               .Street.to_list())
-    if acceptable_street_names:
-        # remove none type
-        for i, street in enumerate(acceptable_street_names):
-            if not isinstance(street, str):
-                acceptable_street_names.pop(i)
-        return acceptable_street_names
+def load_SF_streets(SF_street_path: str = os.path.join(data_dir, 'Street_names.json')) -> list:
+    """Loads the list containing all street names in SF from json file."""
+    if os.path.exists(SF_street_path):
+        try:
+            with open(SF_street_path, 'r') as fp:
+                streets = json.load(fp)
+                return streets
+        except FileNotFoundError:
+            raise FileNotFoundError(f'Street_names.json file not found at {SF_street_path}')
     else:
-        return None
+        raise FileNotFoundError(f'{SF_street_path} does not exist, cannot find street_names.json')
 
 
 def create_db_connection(db_path: str):
@@ -255,10 +253,10 @@ def create_db_connection(db_path: str):
             return conn
 
 
-def load_tree_data(path: str):
+def load_tree_data(path: str = os.path.join(data_dir, 'Plum_Street_Tree_List.pkl')) -> pd.DataFrame | int:
     """Loads the Plum_Street_Tree_List.csv file into a pandas dataframe and returns it"""
     try:
-        tree_data = pd.read_csv(path).set_index(['TreeID'])
+        tree_data = pd.read_pickle(path).set_index(['TreeID'])
     except FileNotFoundError:
         # tree data not found
         return 593
@@ -352,19 +350,19 @@ def find_closest_plum(input_address: str, config):
 
     user_address = Address(input_address)
 
+    SF_streets = load_SF_streets()
+    if not SF_streets:
+        # file unable to load
+        return 492
+
+    process_address_status = user_address.process_address(SF_streets)
+
+    if isinstance(process_address_status, int):
+        return process_address_status
+
     # load list containing all street names in SF
-    with create_db_connection(os.path.join(data_dir, 'Addresses.db')) as db_connection:
-        SF_streets = load_SF_streets(db_connection)
-        if not SF_streets:
-            # file unable to load
-            return 492
-
-        process_address_status = user_address.process_address(SF_streets)
-
-        if isinstance(process_address_status, int):
-            return process_address_status
-
-        if use_SQL:
+    if use_SQL:
+        with create_db_connection(os.path.join(data_dir, 'Addresses.db')) as db_connection:
             geocode_set = user_address.set_geocode_from_db(db_connection)
 
     try:
@@ -390,8 +388,7 @@ def find_closest_plum(input_address: str, config):
 
     # load tree data
     # may make this async in future
-    tree_data_path = os.path.join(data_dir, 'Plum_Street_Tree_List.csv')
-    tree_data = load_tree_data(tree_data_path)
+    tree_data = load_tree_data()
 
     if type(tree_data) == int:
         return tree_data
