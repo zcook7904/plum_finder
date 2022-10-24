@@ -228,7 +228,7 @@ def _get_cli_args():
     return address
 
 
-def load_SF_streets(SF_street_path: str = os.path.join(data_dir, 'Street_names.json')) -> list:
+def load_SF_streets(SF_street_path: str = os.path.join(data_dir, 'Street_Names.json')) -> list:
     """Loads the list containing all street names in SF from json file."""
     if os.path.exists(SF_street_path):
         try:
@@ -236,7 +236,7 @@ def load_SF_streets(SF_street_path: str = os.path.join(data_dir, 'Street_names.j
                 streets = json.load(fp)
                 return streets
         except FileNotFoundError:
-            raise FileNotFoundError(f'Street_names.json file not found at {SF_street_path}')
+            raise FileNotFoundError(f'Street_Names.json file not found at {SF_street_path}')
     else:
         raise FileNotFoundError(f'{SF_street_path} does not exist, cannot find street_names.json')
 
