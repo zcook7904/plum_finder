@@ -362,8 +362,12 @@ def find_closest_plum(input_address: str, config):
 
     # load list containing all street names in SF
     if use_SQL:
-        with create_db_connection(os.path.join(data_dir, 'Addresses.db')) as db_connection:
-            geocode_set = user_address.set_geocode_from_db(db_connection)
+        try:
+            with create_db_connection(os.path.join(data_dir, 'Addresses.db')) as db_connection:
+                geocode_set = user_address.set_geocode_from_db(db_connection)
+        except sqlite3.Error as e:
+            print(e)
+        db_connection.close()
 
     try:
         gmaps = create_client(key)
