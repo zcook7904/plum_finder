@@ -354,6 +354,12 @@ def find_closest_plum(input_address: str, config):
         start_time = time()
 
     input_address = input_address.replace('.', '')
+    if input_address.find('San Francisco') != -1:
+        if input_address.find(',') != -1:
+            input_address, _ = input_address.split(',')
+        else:
+            input_address, _ = input_address.split('San Francisco')
+    input_address = input_address.strip()
     user_address = Address(input_address)
 
     SF_streets = load_SF_streets()

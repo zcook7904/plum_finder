@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SF_plum_finder"
-version = "1.2.7"
+version = "1.2.8"
 authors = [
   { name="Zaven Cook", email="zavencook@gmail.com" },
 ]
