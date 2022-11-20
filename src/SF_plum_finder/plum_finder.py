@@ -472,12 +472,14 @@ def return_tree(closest_tree, input_address: str):
     # return the closest tree
     address = closest_tree['qAddress'][0]
     species = closest_tree['qSpecies'][0]
+    scientific_name, common_name = species.split(' :: ')
     distance = closest_tree['street_distance'][0]
 
-    response = """Closest tree to {}:
-Species: {}
-Address: {}
-Distance: {}m""".format(input_address, species, address, distance)
+    response = f"""Closest tree to {input_address.title()}:
+Sc. Name: {scientific_name.title()}
+Name: {common_name.title()}
+Address: {address}
+Distance: {distance}m"""
     return response
 
 
