@@ -353,6 +353,7 @@ def find_closest_plum(input_address: str, config):
     if performance_log:
         start_time = time()
 
+    input_address = input_address.replace('.', '')
     user_address = Address(input_address)
 
     SF_streets = load_SF_streets()
