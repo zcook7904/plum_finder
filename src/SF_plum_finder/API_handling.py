@@ -35,7 +35,8 @@ def get_geolocation(client, address: str):
         # response = open_last_response('test.json')
         latitude = float(response['geometry']['location']['lat'])
         longitude = float(response['geometry']['location']['lng'])
-        return latitude, longitude
+        returned_address, _ = response['formatted_address'].split(',', 1)
+        return latitude, longitude, returned_address
 
     except googlemaps.exceptions.ApiError:
         raise ValueError('Something is wrong with the API usage')

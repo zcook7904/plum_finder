@@ -12,3 +12,4 @@ config.ini
 performance_log.csv
 profile.txt
 *.prof
+/scripts/street_types.txt

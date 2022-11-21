@@ -94,7 +94,7 @@ class Address:
     def process_address(self, SF_streets: list[str]):
         """ verify the user has given a real address and process the address into something manageable by
         the Google Maps api.
-        Accepts list in format [number, street_name, stree_type] and returns string of full postal address"""
+        Accepts list in format [number, street_name, street_type] and returns string of full postal address"""
 
         if not self.check_address_arg_length():
             return 490
@@ -105,14 +105,16 @@ class Address:
         # clean up street name
         self.format_street_name()
 
-        if not self.check_if_street_in_SF(SF_streets):
-            # street
-            return 493
+        street_abbreviation_dict = load_street_type_abbreviations()
+        if self.get_address_as_list()[-1].lower() in street_abbreviation_dict.keys():
+            street_type = self.street_name.rsplit(' ')[-1]
+            abbreviated_street_type = street_abbreviation_dict[street_type.lower()]
+            self.street_name = self.street_name.replace(street_type, abbreviated_street_type)
 
-    def set_geolocation_from_gmaps(self, gmaps):
+    def set_geolocation_from_gmaps(self, gmaps, update_address: bool = True):
         """Get the geolocation of the address"""
         try:
-            latitude, longitude = get_geolocation(gmaps, self.get_full_address())
+            latitude, longitude, updated_address = get_geolocation(gmaps, self.get_full_address())
             self.latitude = latitude
             self.longitude = longitude
         except ValueError:
@@ -121,6 +123,9 @@ class Address:
         except RuntimeError:
             # timed out
             return 592
+        else:
+            if updated_address:
+                self.street_address = updated_address
 
     def set_geocode_from_db(self, db_connection):
         """Gets the users geocode from the SF address database."""
@@ -135,7 +140,7 @@ class Address:
             self.longitude = address_df.Longitude[0]
             return True
         else:
-            return None
+            return False
 
 
 def load_config():
@@ -177,7 +182,7 @@ error_dict = {
 
 def create_performance_log():
     """Creates the header row of the performance log and saves the file in the working directory"""
-    header = ['InputAddress', 'InputLatitude', 'InputLongitude',
+    header = ['InputAddress', 'UsedAddress', 'InputLatitude', 'InputLongitude',
               'ApproxTreeID', 'ApproxAddress', 'ApproxLatitude', 'ApproxLongitude',
               'ActualTreeID', 'ActualAddress', 'ActualLatitude', 'ActualLongitude',
               'DistanceDifference', 'UseSQL', 'SQL_Used', 'TotalTime']
@@ -185,6 +190,7 @@ def create_performance_log():
         with open('performance_log.csv', 'x', newline='') as csv_file:
             writer = csv_writer(csv_file)
             writer.writerow(header)
+            logging.info('Creating new performance log')
             return True
 
     except FileExistsError:
@@ -240,6 +246,15 @@ def load_SF_streets(SF_street_path: str = os.path.join(data_dir, 'Street_Names.j
             raise FileNotFoundError(f'Street_Names.json file not found at {SF_street_path}')
     else:
         raise FileNotFoundError(f'{SF_street_path} does not exist, cannot find street_names.json')
+
+
+def load_street_type_abbreviations(path: str = os.path.join(data_dir, 'street_types.json')) -> dict:
+    if os.path.exists(path):
+        try:
+            with open(path, 'r') as fp:
+                return json.load(fp)
+        except FileNotFoundError:
+            raise FileNotFoundError(f'Street type json file not found at {path}')
 
 
 def create_db_connection(db_path: str):
@@ -441,6 +456,7 @@ def find_closest_plum(input_address: str, config):
 
     # adding the walking distance
     response['street_distance'] = [distances[0]['distance']]
+    response['used_address'] = user_address
 
     # logging data for performance and usage monitoring
     if performance_log:
@@ -449,7 +465,7 @@ def find_closest_plum(input_address: str, config):
         closest_tree = closest_tree.iloc[0]
 
         # creates row and appends it to performance_log.csv
-        log_row = [user_address.street_address, user_address.latitude, user_address.longitude,
+        log_row = [input_address,user_address.street_address, user_address.latitude, user_address.longitude,
                    approx_closest_tree.name, approx_closest_tree.loc['Latitude'], approx_closest_tree.loc['Longitude'],
                    closest_tree.name, closest_tree.loc['Latitude'], closest_tree.loc['Longitude'],
                    distances_difference, use_SQL, SQL_used, total_time]
@@ -471,12 +487,13 @@ def command_line_runner(config, text_input=None):
     if type(closest_plum) == int:
         print(error_dict[closest_plum])
     else:
-        response = return_tree(closest_plum, CLI_address)
+        response = return_tree(closest_plum)
         print(response)
 
 
-def return_tree(closest_tree, input_address: str):
+def return_tree(closest_tree):
     # return the closest tree
+    input_address = closest_tree['used_address'].street_address
     address = closest_tree['qAddress'][0]
     species = closest_tree['qSpecies'][0]
     scientific_name, common_name = species.split(' :: ')
