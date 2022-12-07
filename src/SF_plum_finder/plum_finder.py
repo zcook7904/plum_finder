@@ -475,12 +475,15 @@ def find_closest_plum(input_address: str, config):
     return response
 
 
-def command_line_runner(config, text_input=None):
+def command_line_runner(config=None, text_input=None):
     """Runs the command line interface. Prints out the results from find_closest_plum"""
     if text_input:
         CLI_address = text_input
     else:
         CLI_address = _get_cli_args()
+
+    if config is None:
+        config = load_config()
 
     closest_plum = find_closest_plum(CLI_address, config)
 
