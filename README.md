@@ -19,9 +19,9 @@ This is generated automatically by running the program the first time.
 Google maps: an appropriate google maps API key must be stored here
 
 ### Settings
-n: number of possible closest trees to be sent to gmaps; max = 25
-usesql: not currently implemented
-performance_log: logs parameters regarding the performance and entered data for each call to find_closest_plum if 
+n: number of possible closest trees to be sent to gmaps; max = 25  
+useSQL: attempt to query a SQLite db for address geocode before making an API call to Google Maps  
+performance_log: logs parameters regarding the performance and entered data for each call to find_closest_plum if
 yes or True
 
 
@@ -35,11 +35,11 @@ CLI usage can be achieved by entering:
 in the working directory.
 
 ### As a module
-Simple CLI use can be acheived through the following script:
+The CLI can also be accessed using the following python code:
 ```
-'from SF_plum_finder import plum_finder
+from SF_plum_finder import plum_finder
 
-plum_finder.command_line_runner()'
+plum_finder.command_line_runner()
 ```
 
 
